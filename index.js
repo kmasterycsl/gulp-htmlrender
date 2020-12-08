@@ -13,6 +13,7 @@ var partialsCache = {},
 	includeRegExp = /<%include ([^>]+)%>/gim,
 	attrTemplateRegExp = /\{\{[ ]*([a-zA-Z]+)[ ]*\}\}/gim,
 	getSrcAttr = createGetAttrFn('src'),
+	getDataAttr = createGetAttrFn('data', "'"),
 	getTransformAttr = createGetAttrFn('transform'),
 	options = {
 		delimiter: '\n'
@@ -62,12 +63,35 @@ function includePartial(partial) {
 			partialContent = getPartialContent(dir, src, transform);
 		}
 
+		var vars = getVariablesFromTag(matches[i]);
+		partialContent = replaceVariables(partialContent, vars);
+
 		if (partialContent) {
 			html = html.replace(matches[i], partialContent);
 		}
 	}
 
 	return html;
+}
+
+function getVariablesFromTag(tagStr) {
+	var dataJson = {};
+
+	try {
+		dataJson = JSON.parse(getDataAttr(tagStr));
+	} catch (e) {
+		console.log('error when parse dataJson:', e);
+	}
+
+	return dataJson || {};
+}
+
+function replaceVariables(partialContent, vars) {
+	for (const [key, value] of Object.entries(vars)) {
+		partialContent = partialContent.replace(`%${key}%`, value);
+	}
+
+	return partialContent;
 }
 
 function getPartial(partialPath, transform) {
@@ -169,13 +193,13 @@ function resolveTemplateAttrs(template) {
 	return attrs;
 }
 
-function getAttrRegExp(attr) {
-	return attrRegExpCache[attr] || (varRegExpCache[attr] = new RegExp(attr + '="([^"]+)"'));
+function getAttrRegExp(attr, sign) {
+	return attrRegExpCache[attr] || (varRegExpCache[attr] = new RegExp(attr + `=${sign}([^${sign}]+)${sign}`));
 }
 
-function createGetAttrFn(attr) {
+function createGetAttrFn(attr, sign = '"') {
 	return function(html) {
-		var attrMatch = html.match(getAttrRegExp(attr));
+		var attrMatch = html.match(getAttrRegExp(attr, sign));
 		return attrMatch ? attrMatch[1] : null;
 	};
 }
